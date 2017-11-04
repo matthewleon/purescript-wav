@@ -11,6 +11,7 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 
+-- TODO: parameterize datatype of channelData
 type Wav =
   { metadata    :: WavMetadata
   , channelData :: Array TA.Float32Array
