@@ -5,26 +5,30 @@ import Prelude
 import Control.Monad.Except (ExceptT, except, lift, runExceptT)
 import Data.ArrayBuffer.ArrayBuffer as AB
 import Data.ArrayBuffer.DataView as DV
-import Data.ArrayBuffer.DataView.Serialization (Decoder, getASCIIString, getUint16le, getUint32le, runDecoder, skipBytes)
+import Data.ArrayBuffer.DataView.Serialization (Decoder, getASCIIString, getInt32le, getUint16le, getUint32le, getTypedArrayWithLength, runDecoder, skipBytes)
 import Data.ArrayBuffer.TypedArray as TA
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
+import Data.UInt (UInt)
+import Data.UInt as UInt
 
--- TODO: parameterize datatype of channelData
 type Wav =
   { metadata    :: WavMetadata
-  , channelData :: Array TA.Float32Array
+  , audioData   :: WavAudioData
   }
 
--- TODO: user UInt
 type WavMetadata =
-  { numChannels   :: Int
-  , sampleRate    :: Int
-  , byteRate      :: Int
-  , blockAlign    :: Int
-  , bitsPerSample :: Int
+  { numChannels   :: UInt
+  , sampleRate    :: UInt
+  , byteRate      :: UInt
+  , blockAlign    :: UInt
+  , bitsPerSample :: UInt
   }
+
+data WavAudioData =
+  PCM8Data  TA.Uint8Array
+| PCM16Data TA.Int16Array
 
 decode :: AB.ArrayBuffer -> Either String Wav
 decode ab =
@@ -34,15 +38,18 @@ decode ab =
       Just (Tuple _ l)         -> l
       Nothing                  -> Left "WAV parse error"
 
+type ExceptDecoder a = ExceptT String Decoder a
+
 -- http://soundfile.sapp.org/doc/WaveFormat/
-wavDecoder :: ExceptT String Decoder Wav
+wavDecoder :: ExceptDecoder Wav
 wavDecoder = do
   -- https://en.wikipedia.org/wiki/FourCC
   checkStr4 "RIFF" "Invalid WAV file fourCC: "
   lift $ skipBytes 4 -- ChunkSize... unnecessary?
   checkStr4 "WAVE" "Invalid WAV format: "
   metadata <- decodeSubchunk1
-  pure {metadata: metadata, channelData: []}
+  audioData <- decodeSubchunk2 metadata.bitsPerSample
+  pure {metadata: metadata, audioData: audioData}
 
   where
     getu16  = lift getUint16le
@@ -62,10 +69,13 @@ wavDecoder = do
 
     checkStr4 shouldEq errStr = checkEq getStr4 shouldEq (errStr <> _)
 
+    decodeSubchunk1 :: ExceptDecoder WavMetadata
     decodeSubchunk1 = do
       checkStr4 "fmt " "Invalid WAV subchunk1 id: "
-      checkEq getu32 16 \size -> "Invalid subchunk1 size: " <> show size
-      checkEq getu16 1 \fmt -> "Invalid audio format: " <> show fmt
+      checkEq getu32 (UInt.fromInt 16) \size ->
+        "Invalid subchunk1 size: " <> show size
+      checkEq getu16 (UInt.fromInt 1) \fmt ->
+        "Invalid audio format: " <> show fmt
 
       numChannels   <- getu16
       sampleRate    <- getu32
@@ -81,3 +91,12 @@ wavDecoder = do
       , bitsPerSample: bitsPerSample
       }
 
+    decodeSubchunk2 :: UInt -> ExceptDecoder WavAudioData
+    decodeSubchunk2 bitsPerSample = do
+      checkStr4 "data" "Invalid subchunk2 data tag: "
+      -- technically we should get a uint, but length param below is Int
+      size <- lift getInt32le
+      case UInt.toInt bitsPerSample of
+        8  -> lift $ PCM8Data  <$> getTypedArrayWithLength size
+        16 -> lift $ PCM16Data <$> getTypedArrayWithLength size
+        n  -> except <<< Left $ "Unsupported bits per sample: " <> show n
