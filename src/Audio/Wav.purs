@@ -9,6 +9,7 @@ import Data.ArrayBuffer.Safe.DataView as DV
 import Data.ArrayBuffer.Safe.TypedArray as TA
 import Data.Either (Either(..))
 import Data.Maybe (maybe)
+import Data.Record.ShowRecord (showRecord)
 import Data.Tuple (snd)
 import Data.UInt (UInt)
 import Data.UInt as UInt
@@ -30,10 +31,14 @@ data WavAudioData =
   PCM8Data  TA.Uint8Array
 | PCM16Data TA.Int16Array
 
+toString :: Wav -> String
+toString = showRecord <<< intify <<< _.metadata
+  where intify { numChannels: nc } = {numChannels: UInt.toInt nc}
+
 decode :: AB.ArrayBuffer -> Either String Wav
 decode ab =
   let dv = DV.fromArrayBuffer ab
-      decodeResult = runDecoder (runExceptT wavDecoder) dv 0
+      decodeResult = runDecoder (runExceptT wavDecoder) dv
   in  maybe (Left "WAV parse error") snd decodeResult
 
 type ExceptDecoder a = ExceptT String Decoder a
