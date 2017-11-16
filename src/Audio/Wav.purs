@@ -3,13 +3,13 @@ module Audio.Wav where
 import Prelude
 
 import Control.Monad.Except (ExceptT, except, lift, runExceptT)
-import Data.ArrayBuffer.ArrayBuffer as AB
-import Data.ArrayBuffer.DataView as DV
 import Data.ArrayBuffer.DataView.Serialization (Decoder, getASCIIString, getInt32le, getUint16le, getUint32le, getTypedArrayWithLength, runDecoder, skipBytes)
-import Data.ArrayBuffer.TypedArray as TA
+import Data.ArrayBuffer.Safe.ArrayBuffer as AB
+import Data.ArrayBuffer.Safe.DataView as DV
+import Data.ArrayBuffer.Safe.TypedArray as TA
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..))
-import Data.Tuple (Tuple(..))
+import Data.Maybe (maybe)
+import Data.Tuple (snd)
 import Data.UInt (UInt)
 import Data.UInt as UInt
 
@@ -33,10 +33,8 @@ data WavAudioData =
 decode :: AB.ArrayBuffer -> Either String Wav
 decode ab =
   let dv = DV.fromArrayBuffer ab
-  in  case runDecoder (runExceptT wavDecoder) dv 0 of
-      Just (Tuple _ (Right _)) -> Left "TODO"
-      Just (Tuple _ l)         -> l
-      Nothing                  -> Left "WAV parse error"
+      decodeResult = runDecoder (runExceptT wavDecoder) dv 0
+  in  maybe (Left "WAV parse error") snd decodeResult
 
 type ExceptDecoder a = ExceptT String Decoder a
 
