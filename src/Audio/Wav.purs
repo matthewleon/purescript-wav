@@ -37,12 +37,14 @@ toString = showRecord <<< intify <<< _.metadata
   where intify { numChannels: nc } = {numChannels: UInt.toInt nc}
 
 decode :: AB.ArrayBuffer -> Either String Wav
-decode ab =
-  let dv = DV.fromArrayBuffer ab
-      decodeResult = runDecoder (runExceptT wavDecoder) dv
-  in  maybe (Left "WAV parse error") snd decodeResult
+decode = runExceptDecoder wavDecoder "WAV parse error" <<< DV.fromArrayBuffer
 
+-- a Decoder monad that throws descriptive error strings
 type ExceptDecoder a = ExceptT String Decoder a
+
+runExceptDecoder :: forall a. ExceptDecoder a -> String -> DV.DataView -> Either String a
+runExceptDecoder dec errStr =
+  maybe (Left errStr) snd <<< runDecoder (runExceptT dec)
 
 type FormatID = String
 
@@ -57,8 +59,10 @@ wavDecoder = do
   metadata <- decodeFmtChunk
 
   audioDataChunkDataView <- snd <$> iterateUntil (\(Tuple fid _) -> fid == "data") (lift decodeChunk)
-  audioData <- except $ maybe (Left "Error decoding audio data.") snd $
-    runDecoder (runExceptT $ decodeDataChunk metadata.bitsPerSample) audioDataChunkDataView
+  audioData <- except $ runExceptDecoder
+    (decodeDataChunk metadata.bitsPerSample)
+    "Error decoding audio data."
+    audioDataChunkDataView
 
   pure {metadata: metadata, audioData: audioData}
 
@@ -91,9 +95,8 @@ wavDecoder = do
         except <<< Left $ "Invalid WAV subchunk1 id: " <> fid
       unless (DV.byteLength dv == 16) $
         except <<< Left $ "Invalid subchunk1 size: " <> show (DV.byteLength dv)
-      except <<< maybe decodeErr snd $ runDecoder (runExceptT decodeMetadata) dv
+      except $ runExceptDecoder decodeMetadata "Error decoding metadata." dv
         where
-        decodeErr = Left "Error decoding metadata."
         decodeMetadata = do
           checkEq getu16 (UInt.fromInt 1) \fmt ->
             "Invalid audio format: " <> show fmt
