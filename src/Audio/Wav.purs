@@ -90,7 +90,7 @@ wavDecoder = do
 
     decodeFmtChunk :: ExceptDecoder WavMetadata
     decodeFmtChunk = do
-      (Tuple fid dv) <- lift decodeChunk
+      Tuple fid dv <- lift decodeChunk
       unless (fid == "fmt ") $
         except <<< Left $ "Invalid WAV subchunk1 id: " <> fid
       unless (DV.byteLength dv == 16) $
