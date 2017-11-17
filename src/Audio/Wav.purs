@@ -3,7 +3,8 @@ module Audio.Wav where
 import Prelude
 
 import Control.Monad.Except (ExceptT, except, lift, runExceptT)
-import Data.ArrayBuffer.DataView.Serialization (Decoder, getASCIIString, getInt32le, getUint16le, getUint32le, getTypedArrayWithLength, getDataViewWithLength, runDecoder, skipBytes)
+import Control.Monad.Loops (iterateUntil)
+import Data.ArrayBuffer.DataView.Serialization (Decoder, getASCIIString, getInt32le, getUint16le, getUint32le, getTypedArray, getDataViewWithLength, runDecoder, skipBytes)
 import Data.ArrayBuffer.Safe.ArrayBuffer as AB
 import Data.ArrayBuffer.Safe.DataView as DV
 import Data.ArrayBuffer.Safe.TypedArray as TA
@@ -52,8 +53,13 @@ wavDecoder = do
   checkStr4 "RIFF" "Invalid WAV file fourCC: "
   lift $ skipBytes 4 -- ChunkSize... unnecessary?
   checkStr4 "WAVE" "Invalid WAV format: "
+
   metadata <- decodeFmtChunk
-  audioData <- decodeDataChunk metadata.bitsPerSample
+
+  audioDataChunkDataView <- snd <$> iterateUntil (\(Tuple fid _) -> fid == "data") (lift decodeChunk)
+  audioData <- except $ maybe (Left "Error decoding audio data.") snd $
+    runDecoder (runExceptT $ decodeDataChunk metadata.bitsPerSample) audioDataChunkDataView
+
   pure {metadata: metadata, audioData: audioData}
 
   where
@@ -107,11 +113,8 @@ wavDecoder = do
           }
 
     decodeDataChunk :: UInt -> ExceptDecoder WavAudioData
-    decodeDataChunk bitsPerSample = do
-      checkStr4 "data" "Invalid subchunk2 data tag: "
-      -- technically we should get a uint, but length param below is Int
-      size <- lift getInt32le
+    decodeDataChunk bitsPerSample =
       case UInt.toInt bitsPerSample of
-        8  -> lift $ PCM8Data  <$> getTypedArrayWithLength size
-        16 -> lift $ PCM16Data <$> getTypedArrayWithLength size
+        8  -> lift $ PCM8Data  <$> getTypedArray
+        16 -> lift $ PCM16Data <$> getTypedArray
         n  -> except <<< Left $ "Unsupported bits per sample: " <> show n

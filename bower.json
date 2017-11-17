@@ -11,7 +11,8 @@
     "purescript-console": "^3.0.0",
     "purescript-dataview-serialization": "matthewleon/purescript-dataview-serialization",
     "purescript-transformers": "^3.4.0",
-    "purescript-record-show": "^0.3.1"
+    "purescript-record-show": "^0.3.1",
+    "purescript-monad-loops": "^0.4.0"
   },
   "devDependencies": {
     "purescript-node-buffer": "matthewleon/purescript-node-buffer#toArrayBuffer",
