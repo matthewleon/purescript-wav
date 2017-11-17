@@ -101,19 +101,12 @@ wavDecoder = do
           checkEq getu16 (UInt.fromInt 1) \fmt ->
             "Invalid audio format: " <> show fmt
 
-          numChannels   <- getu16
-          sampleRate    <- getu32
-          byteRate      <- getu32
-          blockAlign    <- getu16
-          bitsPerSample <- getu16
-
-          pure {
-            numChannels:   numChannels
-          , sampleRate:    sampleRate
-          , byteRate:      byteRate
-          , blockAlign:    blockAlign
-          , bitsPerSample: bitsPerSample
-          }
+          { numChannels:   _
+          , sampleRate:    _
+          , byteRate:      _
+          , blockAlign:    _
+          , bitsPerSample: _
+          } <$> getu16 <*> getu32 <*> getu32 <*> getu16 <*> getu16
 
     decodeDataChunk :: UInt -> ExceptDecoder WavAudioData
     decodeDataChunk bitsPerSample =
