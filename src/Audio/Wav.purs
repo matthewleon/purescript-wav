@@ -58,7 +58,8 @@ wavDecoder = do
 
   metadata <- decodeFmtChunk
 
-  audioDataChunkDataView <- snd <$> iterateUntil (\(Tuple fid _) -> fid == "data") (lift decodeChunk)
+  audioDataChunkDataView <-
+    snd <$> iterateUntil (\(Tuple fid _) -> fid == "data") (lift decodeChunk)
   audioData <- except $ runExceptDecoder
     (decodeDataChunk metadata.bitsPerSample)
     "Error decoding audio data."
