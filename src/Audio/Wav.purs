@@ -33,8 +33,20 @@ data WavAudioData =
 | PCM16Data TA.Int16Array
 
 toString :: Wav -> String
-toString = showRecord <<< intify <<< _.metadata
-  where intify { numChannels: nc } = {numChannels: UInt.toInt nc}
+toString {metadata, audioData}
+  = "WAV (length: " <> show dataLength <>
+         ", metadata: " <> showRecord intMetadata <> ")"
+  where
+  intMetadata = {
+      numChannels:   UInt.toInt metadata.numChannels
+    , sampleRate:    UInt.toInt metadata.sampleRate
+    , byteRate:      UInt.toInt metadata.byteRate
+    , blockAlign:    UInt.toInt metadata.blockAlign
+    , bitsPerSample: UInt.toInt metadata.bitsPerSample
+    }
+  dataLength = case audioData of
+    PCM8Data  ta -> TA.byteLength ta
+    PCM16Data ta -> TA.byteLength ta
 
 decode :: AB.ArrayBuffer -> Either String Wav
 decode = runExceptDecoder wavDecoder "WAV parse error" <<< DV.fromArrayBuffer
