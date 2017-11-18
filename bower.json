@@ -17,7 +17,8 @@
   "devDependencies": {
     "purescript-node-buffer": "matthewleon/purescript-node-buffer#toArrayBuffer",
     "purescript-psci-support": "^3.0.0",
-    "purescript-node-fs": "^4.0.0"
+    "purescript-node-fs": "^4.0.0",
+    "purescript-minibench": "^1.0.0"
   },
   "resolutions": {
     "purescript-node-buffer": "toArrayBuffer"
